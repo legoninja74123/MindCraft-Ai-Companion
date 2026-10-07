@@ -1,6 +1,6 @@
 {
     "name": "andy",
 
-    "model": "gpt-5.4-mini"
+    "model": "groq/openai/gpt-oss-120b"
 
 }
