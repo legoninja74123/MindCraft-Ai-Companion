@@ -2,45 +2,127 @@
 import assert from 'node:assert/strict';
 import { Companion } from './companion.js';
 
-// A minimal bot stub; no live Minecraft connection is needed.
-const companion = new Companion({ registry: null });
+function createTestCompanion() {
+    const companion = new Companion({ registry: null });
 
-// Stub Minecraft reads so this test focuses on companion integration.
-companion.minecraft.isConnected = () => true;
-companion.minecraft.getPosition = () => ({ x: 10, y: 64, z: 20 });
-companion.minecraft.getHealth = () => 20;
-companion.minecraft.getFood = () => 20;
-companion.minecraft.getDimension = () => 'overworld';
-companion.minecraft.getGameMode = () => 'survival';
-companion.minecraft.getInventory = () => [];
+    // Stub Minecraft reads so no live connection is needed.
+    companion.minecraft.isConnected = () => true;
+    companion.minecraft.getPosition = () => ({
+        x: 10,
+        y: 64,
+        z: 20
+    });
+    companion.minecraft.getHealth = () => 20;
+    companion.minecraft.getFood = () => 20;
+    companion.minecraft.getDimension = () => 'overworld';
+    companion.minecraft.getGameMode = () => 'survival';
+    companion.minecraft.getInventory = () => [];
 
-assert.ok(companion.eventManager);
-assert.ok(companion.goalManager);
-assert.ok(companion.worldModel);
+    companion.minecraft.getNearbyBlocks = () => [];
+    companion.minecraft.getNearbyEntities = () => [];
 
-// Create a goal and activate its first subgoal through public methods.
-const goal = companion.goalManager.createGoal('Build a shelter');
-const subgoal = companion.goalManager.addSubgoal(
-    goal.id,
-    'Gather wood'
-);
+    return companion;
+}
 
-assert.equal(
-    companion.goalManager.startNextSubgoal(goal.id).id,
-    subgoal.id
-);
+// Test 1: Companion exposes its managers and current state.
+{
+    const companion = createTestCompanion();
 
-// Read all companion state through its public interface.
-const state = companion.getState();
+    assert.ok(companion.eventManager);
+    assert.ok(companion.attentionManager);
+    assert.ok(companion.goalManager);
+    assert.ok(companion.worldModel);
 
-assert.equal(state.connected, true);
-assert.deepEqual(state.position, { x: 10, y: 64, z: 20 });
+    const goal = companion.goalManager.createGoal('Build a shelter');
+    const subgoal = companion.goalManager.addSubgoal(
+        goal.id,
+        'Gather wood'
+    );
 
-assert.ok(state.worldModel);
-assert.ok(state.goals);
-assert.equal(state.goals.activeGoal.id, goal.id);
-assert.equal(state.goals.activeSubgoal.id, subgoal.id);
-assert.equal(state.goals.activeGoal.status, 'active');
-assert.equal(state.goals.activeSubgoal.status, 'active');
+    assert.equal(
+        companion.goalManager.startNextSubgoal(goal.id).id,
+        subgoal.id
+    );
+
+    const state = companion.getState();
+
+    assert.equal(state.connected, true);
+    assert.deepEqual(state.position, { x: 10, y: 64, z: 20 });
+
+    assert.ok(state.worldModel);
+    assert.ok(state.goals);
+    assert.ok(Object.hasOwn(state, 'attention'));
+    assert.ok(Array.isArray(state.pendingAttentionEvents));
+
+    assert.equal(state.goals.activeGoal.id, goal.id);
+    assert.equal(state.goals.activeSubgoal.id, subgoal.id);
+    assert.equal(state.goals.activeGoal.status, 'active');
+    assert.equal(state.goals.activeSubgoal.status, 'active');
+}
+
+// Test 2: An active subgoal becomes the attention focus
+// when there are no higher-priority events.
+{
+    const companion = createTestCompanion();
+
+    const goal = companion.goalManager.createGoal('Build a shelter');
+    const subgoal = companion.goalManager.addSubgoal(
+        goal.id,
+        'Gather wood'
+    );
+
+    companion.goalManager.startNextSubgoal(goal.id);
+
+    const observation = companion.observeNearby();
+
+    assert.equal(observation.attention.type, 'SUBGOAL');
+    assert.equal(observation.attention.data.id, subgoal.id);
+    assert.equal(companion.getState().attention.type, 'SUBGOAL');
+}
+
+// Test 3: An immediate hostile threat takes priority
+// over an active subgoal.
+{
+    const companion = createTestCompanion();
+
+    const goal = companion.goalManager.createGoal('Build a shelter');
+    companion.goalManager.addSubgoal(goal.id, 'Gather wood');
+    companion.goalManager.startNextSubgoal(goal.id);
+
+    // Keep this integration test independent of entity metadata.
+    // WorldModel classification is tested separately.
+    companion.worldModel.getEntityMemoryPolicy = () => 'hostile';
+
+    companion.minecraft.getNearbyEntities = () => [
+        {
+            id: 'test-zombie',
+            name: 'zombie',
+            type: 'zombie',
+            position: { x: 12, y: 64, z: 20 }
+        }
+    ];
+
+    const observation = companion.observeNearby();
+
+    assert.ok(
+        observation.events.some(
+            event =>
+                event.type === 'HOSTILE_DETECTED' &&
+                event.data.withinThreatRange === true
+        )
+    );
+
+    assert.equal(observation.attention.type, 'WORLD_EVENT');
+    assert.equal(
+        observation.attention.data.type,
+        'HOSTILE_DETECTED'
+    );
+
+    // The goal remains active; attention has not cancelled it.
+    assert.equal(
+        companion.goalManager.getActiveGoal().status,
+        'active'
+    );
+}
 
 console.log('All Companion integration tests passed.');

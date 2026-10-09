@@ -1,6 +1,7 @@
 import { MinecraftInterface } from './minecraft_interface.js';
 import { WorldModel } from './world_model.js';
 import { EventManager } from './event_manager.js';
+import { AttentionManager } from './attention_manager.js';
 import { GoalManager } from './goal_manager.js';
 /**
  * Companion
@@ -33,7 +34,11 @@ export class Companion {
         this.minecraft = new MinecraftInterface(bot);
         this.worldModel = new WorldModel(bot.registry);
         this.eventManager = new EventManager({ threatRange: 6 });
+        this.attentionManager = new AttentionManager();
         this.goalManager = new GoalManager();
+
+        // The latest attention decision, for inspection and debugging.
+        this.currentAttention = null;
     }
 
     observeNearby(distance = 8, count = 1000) {
@@ -42,6 +47,7 @@ export class Companion {
             distance,
             count
         );
+
         const entities = this.minecraft.getNearbyEntities(distance);
 
         const blockResults = this.worldModel.observeBlocks(blocks);
@@ -57,9 +63,18 @@ export class Companion {
             this.minecraft.getPosition()
         );
 
+        // Connect observed world events and persistent objectives
+        // to the deterministic attention selector.
+        this.currentAttention = this.attentionManager.selectFocus({
+            events,
+            activeGoal: this.goalManager.getActiveGoal(),
+            activeSubgoal: this.goalManager.getActiveSubgoal()
+        });
+
         return {
             ...observation,
-            events
+            events,
+            attention: this.currentAttention
         };
     }
 
@@ -73,7 +88,10 @@ export class Companion {
             gameMode: this.minecraft.getGameMode(),
             inventory: this.minecraft.getInventory(),
             worldModel: this.worldModel.getSummary(),
-            goals: this.goalManager.getState()
+            goals: this.goalManager.getState(),
+            attention: this.currentAttention,
+            pendingAttentionEvents:
+                this.attentionManager.getPendingEvents()
         };
     }
 }
