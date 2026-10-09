@@ -127,6 +127,8 @@ export function initBot(username) {
         mc_version = bot.version;
         mcdata = minecraftData(mc_version);
         Item = prismarine_items(mc_version);
+
+
     });
 
     return bot;
@@ -191,6 +193,22 @@ export function getEntityId(entityName) {
         return entity.id;
     }
     return null;
+}
+
+/**
+ * Returns Minecraft metadata for an entity by name.
+ * Returns null if metadata is not initialized or the entity is unknown.
+ */
+export function getEntityMetadata(entityName) {
+    if (!mcdata || !entityName) {
+        return null;
+    }
+
+    const name = String(entityName)
+        .replace(/^minecraft:/i, '')
+        .toLowerCase();
+
+    return mcdata.entitiesByName?.[name] ?? null;
 }
 
 export function getAllItems(ignore) {

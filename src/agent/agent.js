@@ -18,6 +18,8 @@ import { Task } from './tasks/tasks.js';
 import { speak } from './speak.js';
 import { log, validateNameFormat, handleDisconnection } from './connection_handler.js';
 
+import { Companion } from '../companion/companion.js';
+
 export class Agent {
     async start(load_mem=false, init_message=null, count_id=0) {
         this.last_sender = null;
@@ -64,6 +66,40 @@ export class Agent {
 
         console.log(this.name, 'logging into minecraft...');
         this.bot = initBot(this.name);
+
+        // Cognitive/body boundary.
+        this.companion = new Companion(this.bot);
+
+        //TEMPORARY TEST
+        const registry = this.bot.registry;
+
+        console.log('\n[Companion Debug] Registry inspection:');
+        console.log('Registry exists:', !!registry);
+        console.log('Registry type:', typeof registry);
+        console.log(
+            'Registry keys:',
+            registry ? Object.keys(registry) : 'NO REGISTRY'
+        );
+
+        console.log(
+            'entitiesByName exists:',
+            !!registry?.entitiesByName
+        );
+
+        console.log(
+            'entities exists:',
+            !!registry?.entities
+        );
+
+        console.log(
+            'Entity registry sample:',
+            registry?.entities
+                ? Object.entries(registry.entities).slice(0, 5)
+                : 'NO entities property'
+        );
+        //TEMPORARY TEST
+
+        console.log('Companion core initialized.');
         
         // Connection Handler
         const onDisconnect = (event, reason) => {
@@ -429,6 +465,13 @@ export class Agent {
     }
 
     startEvents() {
+
+        this.bot.on('chat', async (username, message) => {
+            if (username === this.name) {
+                return;
+            }
+
+        });
         // Custom events
         this.bot.on('time', () => {
             if (this.bot.time.timeOfDay == 0)
@@ -520,13 +563,23 @@ export class Agent {
     async update(delta) {
         await this.bot.modes.update();
         this.self_prompter.update(delta);
+
+        // Update the persistent world representation.
+        if (this.companion) {
+            try {
+                this.companion.observeNearby(8, 500);
+            } catch (error) {
+                console.error('Companion world observation error:', error);
+            }
+        }
+
         await this.checkTaskDone();
     }
 
     isIdle() {
         return !this.actions.executing;
     }
-    
+
 
     cleanKill(msg='Killing agent process...', code=1) {
         this.history.add('system', msg);
