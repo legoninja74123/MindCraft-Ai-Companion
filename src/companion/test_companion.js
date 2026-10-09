@@ -125,4 +125,51 @@ function createTestCompanion() {
     );
 }
 
+
+ // Test 4: The Companion can acknowledge a pending attention event.
+{
+    const companion = createTestCompanion();
+
+    const event = {
+        id: 'test-block-change',
+        type: 'BLOCK_CHANGED',
+        priority: 'normal',
+        timestamp: Date.now(),
+        data: {
+            position: { x: 11, y: 64, z: 20 }
+        }
+    };
+
+    companion.attentionManager.selectFocus({
+        events: [event]
+    });
+
+    assert.ok(
+        companion.getState().pendingAttentionEvents.some(
+            pending => pending.id === event.id
+        ),
+        'Event should be pending before acknowledgment'
+    );
+
+    assert.equal(
+        companion.acknowledgeAttentionEvent(event.id),
+        true,
+        'Acknowledgment should succeed for a pending event'
+    );
+
+    assert.equal(
+        companion.getState().pendingAttentionEvents.some(
+            pending => pending.id === event.id
+        ),
+        false,
+        'Acknowledged event should no longer be pending'
+    );
+
+    assert.equal(
+        companion.acknowledgeAttentionEvent(event.id),
+        false,
+        'Acknowledging the same event again should return false'
+    );
+}
+
 console.log('All Companion integration tests passed.');

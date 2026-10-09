@@ -78,6 +78,10 @@ export class Companion {
         };
     }
 
+    acknowledgeAttentionEvent(eventId) {
+        return this.attentionManager.acknowledgeEvent(eventId);
+    }
+
     getState() {
         return {
             connected: this.minecraft.isConnected(),
