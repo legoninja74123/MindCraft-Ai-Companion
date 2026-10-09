@@ -265,4 +265,31 @@ console.log('PASS: Unknown entities default to unknown');
 
 console.log('PASS: Entity memory policies work');
 
+// Entity-memory status tests.
+const statusModel = new WorldModel();
+
+const hostile = {
+    id: 901,
+    name: 'zombie',
+    type: 'zombie',
+    position: { x: 1, y: 64, z: 1 }
+};
+
+statusModel.observeEntity(hostile, {
+    memoryPolicy: 'hostile'
+});
+
+assert.equal(
+    statusModel.getEntityMemoryStatus(901, 30000, 120000),
+    'RECENTLY_SEEN'
+);
+
+// A missing entity is not the same as a confirmed despawn.
+assert.equal(
+    statusModel.getEntityMemoryStatus(999, 30000, 120000),
+    'UNKNOWN'
+);
+
+console.log('Entity-memory status tests passed.');
+
 console.log('\nAll WorldModel tests passed.');

@@ -606,6 +606,40 @@ export class Agent {
         if (this.companion) {
             try {
                 this.companion.observeNearby(8, 500);
+
+                // TEMPORARY DEBUG: create one goal to test interruption preservation.
+                if (!this._companionTestGoalCreated) {
+                    this._companionTestGoalCreated = true;
+
+                    const goal = this.companion.goalManager.createGoal(
+                        'Gather wood for a shelter'
+                    );
+
+                    const subgoal = this.companion.goalManager.addSubgoal(
+                        goal.id,
+                        'Collect logs from nearby trees'
+                    );
+
+                    this.companion.goalManager.startNextSubgoal(goal.id);
+
+                    console.log('[Companion Test] Created goal:', goal.description);
+                    console.log('[Companion Test] Created subgoal:', subgoal.description);
+                }
+
+                // TEMPORARY DEBUG: inspect Companion state every 5 seconds.
+                if (!this._companionDebugLastLog ||
+                    Date.now() - this._companionDebugLastLog >= 5000) {
+                    this._companionDebugLastLog = Date.now();
+
+                    const state = this.companion.getState();
+                    console.log('\n[Companion State Debug]', JSON.stringify({
+                        execution: state.execution,
+                        goals: state.goals,
+                        interruptions: state.interruptions
+                    }, null, 2));
+                }
+                // TEMP
+
             } catch (error) {
                 console.error('Companion world observation error:', error);
             }

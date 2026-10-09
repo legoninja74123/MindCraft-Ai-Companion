@@ -93,4 +93,23 @@ events = manager.process({
 
 assert.equal(events.length, 0);
 
-console.log('All 6 EventManager tests passed.');
+
+// Test 7: A hostile leaving threat range should not trigger a new threat event.
+events = manager.process({
+    blocks: [],
+    entities: [hostileResult('UPDATED', 101, 10)]
+}, selfPosition);
+
+assert.equal(events.length, 0);
+
+// Test 8: An empty entity observation currently emits no threat-clear event.
+events = manager.process({
+    blocks: [],
+    entities: []
+}, selfPosition);
+
+assert.equal(events.length, 0);
+assert.equal(manager.hostileInRange.has(101), true);
+
+
+console.log('All 8 EventManager tests passed.');
