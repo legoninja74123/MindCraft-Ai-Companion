@@ -68,7 +68,10 @@ export class Agent {
         this.bot = initBot(this.name);
 
         // Cognitive/body boundary.
-        this.companion = new Companion(this.bot);
+        this.companion = new Companion(
+            this.bot,
+            () => this.getExecutionState()
+        );
 
         //TEMPORARY TEST
         const registry = this.bot.registry;
@@ -264,6 +267,41 @@ export class Agent {
             console.log(`Missing players/bots: ${missingPlayers.join(', ')}`);
             this.cleanKill('Not all required players/bots are present in the world. Exiting.', 4);
         }
+    }
+
+    getExecutionState() {
+        const actionManager = this.actions;
+        const actionLabel = actionManager?.currentActionLabel || '';
+        const executing = actionManager?.executing === true;
+
+        const modeName = actionLabel.startsWith('mode:')
+            ? actionLabel.slice('mode:'.length)
+            : null;
+
+        const survivalModes = new Set([
+            'self_preservation',
+            'cowardice',
+            'self_defense'
+        ]);
+
+        const isSurvivalResponse =
+            executing &&
+            modeName !== null &&
+            survivalModes.has(modeName);
+
+        return {
+            executing,
+            actionLabel: actionLabel || null,
+            modeName,
+            isSurvivalResponse,
+            status: !executing
+                ? 'IDLE'
+                : isSurvivalResponse
+                    ? 'SURVIVAL_RESPONSE'
+                    : modeName
+                        ? 'MODE_ACTION'
+                        : 'ACTION'
+        };
     }
 
     requestInterrupt() {

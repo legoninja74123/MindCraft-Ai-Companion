@@ -3,6 +3,7 @@ import { WorldModel } from './world_model.js';
 import { EventManager } from './event_manager.js';
 import { AttentionManager } from './attention_manager.js';
 import { GoalManager } from './goal_manager.js';
+import { InterruptionManager } from './interruption_manager.js';
 /**
  * Companion
  *
@@ -26,14 +27,16 @@ import { GoalManager } from './goal_manager.js';
  *   communication
  */
 export class Companion {
-    constructor(bot) {
+    constructor(bot, executionStateProvider = null) {
         if (!bot) {
             throw new Error('Companion requires a Minecraft bot.');
         }
 
+        this.executionStateProvider = executionStateProvider;
         this.minecraft = new MinecraftInterface(bot);
         this.worldModel = new WorldModel(bot.registry);
         this.eventManager = new EventManager({ threatRange: 6 });
+        this.interruptionManager = new InterruptionManager();
         this.attentionManager = new AttentionManager();
         this.goalManager = new GoalManager();
 
@@ -63,6 +66,14 @@ export class Companion {
             this.minecraft.getPosition()
         );
 
+        for (const event of events) {
+            this.interruptionManager.beginInterruption(
+                event,
+                this.goalManager.getActiveGoal(),
+                this.goalManager.getActiveSubgoal()
+            );
+        }
+
         // Connect observed world events and persistent objectives
         // to the deterministic attention selector.
         this.currentAttention = this.attentionManager.selectFocus({
@@ -82,6 +93,20 @@ export class Companion {
         return this.attentionManager.acknowledgeEvent(eventId);
     }
 
+    getExecutionState() {
+        if (!this.executionStateProvider) {
+            return {
+                status: 'UNKNOWN',
+                executing: null,
+                actionLabel: null,
+                modeName: null,
+                isSurvivalResponse: false
+            };
+        }
+
+        return this.executionStateProvider();
+    }
+
     getState() {
         return {
             connected: this.minecraft.isConnected(),
@@ -92,7 +117,9 @@ export class Companion {
             gameMode: this.minecraft.getGameMode(),
             inventory: this.minecraft.getInventory(),
             worldModel: this.worldModel.getSummary(),
+            execution: this.getExecutionState(),
             goals: this.goalManager.getState(),
+            interruptions: this.interruptionManager.getState(),
             attention: this.currentAttention,
             pendingAttentionEvents:
                 this.attentionManager.getPendingEvents()

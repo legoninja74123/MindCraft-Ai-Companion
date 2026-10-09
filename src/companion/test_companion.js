@@ -2,8 +2,11 @@
 import assert from 'node:assert/strict';
 import { Companion } from './companion.js';
 
-function createTestCompanion() {
-    const companion = new Companion({ registry: null });
+function createTestCompanion(executionStateProvider = null) {
+    const companion = new Companion(
+        { registry: null },
+        executionStateProvider
+    );
 
     // Stub Minecraft reads so no live connection is needed.
     companion.minecraft.isConnected = () => true;
@@ -169,6 +172,37 @@ function createTestCompanion() {
         companion.acknowledgeAttentionEvent(event.id),
         false,
         'Acknowledging the same event again should return false'
+    );
+}
+
+
+ // Test: Companion reads MindCraft's execution state.
+{
+    const expectedState = {
+        status: 'SURVIVAL_RESPONSE',
+        executing: true,
+        actionLabel: 'mode:cowardice',
+        modeName: 'cowardice',
+        isSurvivalResponse: true
+    };
+
+    const companion = createTestCompanion(
+        () => expectedState
+    );
+
+    assert.deepEqual(
+        companion.getState().execution,
+        expectedState
+    );
+
+    // Reading execution state must not change the goal.
+    const goal = companion.goalManager.createGoal(
+        'Build a shelter'
+    );
+
+    assert.equal(
+        companion.goalManager.getActiveGoal().id,
+        goal.id
     );
 }
 
